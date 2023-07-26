@@ -4,7 +4,7 @@ from tqdm import tqdm
 import numpy as np
 import json
 
-def generate_csv_data(output_dir=".", takeonly=1000000, generate_jets = False, normalize = True):
+def generate_csv_data(output_dir=".", takeonly=1000000, generate_jets = False, normalize = True, jets_keys=[], muons_keys=[]):
   print("Obtaining signal...")
   valid_typenames = ["float", "int64_t", "int32_t", "int16_t", "int8_t", "double", "uint8_t", "bool"]
   with uproot.open("signal_data.root") as sig_file:
@@ -14,17 +14,15 @@ def generate_csv_data(output_dir=".", takeonly=1000000, generate_jets = False, n
     types = sig_tree.typenames()
 
   if generate_jets:
-    jets_events_keys_to_keep = ["jets.pt", "jets.mass", "jets.charge", "jets.eta", "jets.phi"]
-    jets_events_branches_to_keep = list(set([s.split(".")[0] for s in jets_events_keys_to_keep]))
+    jets_events_branches_to_keep = list(set([s.split(".")[0] for s in jets_keys]))
     jets_events_keys = [s for s in events_keys if types[s].split("[]")[0] in valid_typenames]
     jets_events_keys = [s.split("/")[-1] for s in jets_events_keys if any([b in s and b != s for b in jets_events_branches_to_keep])]
-    jets_events_keys = [s for s in jets_events_keys if s in jets_events_keys_to_keep]
+    jets_events_keys = [s for s in jets_events_keys if s in jets_keys]
 
-  events_keys_to_keep = ["muons.pt", "muons.charge", "muons.eta", "muons.phi", "muPairs.mass", "muPairs.pt", "muPairs.eta"]
-  events_branches_to_keep = list(set([s.split(".")[0] for s in events_keys_to_keep]))
+  events_branches_to_keep = list(set([s.split(".")[0] for s in muons_keys]))
   events_keys = [s for s in events_keys if types[s].split("[]")[0] in valid_typenames]
   events_keys = [s.split("/")[-1] for s in events_keys if any([b in s and b != s for b in events_branches_to_keep])]
-  events_keys = [s for s in events_keys if s in events_keys_to_keep]
+  events_keys = [s for s in events_keys if s in muons_keys]
   print(f"Using fields: {events_keys}")
   if generate_jets:
     print(f"Jets using fields: {jets_events_keys}")

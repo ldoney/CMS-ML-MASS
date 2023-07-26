@@ -1,5 +1,6 @@
 from os import walk
 import sys
+sys.path.insert(1, "lib")
 from models import GCN
 import torch
 import argparse

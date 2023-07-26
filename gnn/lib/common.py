@@ -4,26 +4,43 @@ import torch
 import numpy as np
 from torch_geometric.data import InMemoryDataset, Data, HeteroData
 
-def create_graph(directory="gnn_outs", generate_jets = False):
+def create_graph(directory="gnn_outs", generate_jets = False, csv_dir=None, jets_keys=[], muons_keys=[]):
+  if csv_dir == None:
+    csv_dir = directory
+
   # Collect data
   print("Reading csv files...")
-  m_nodes_data = pd.read_csv(directory + "/muon_members.csv")
+  m_nodes_data = pd.read_csv(csv_dir + "/muon_members.csv")
   if generate_jets:
-    j_nodes_data = pd.read_csv(directory + "/jet_members.csv")
-  m_m_edges_data = pd.read_csv(directory + "/muon_muon_interactions.csv")
+    j_nodes_data = pd.read_csv(csv_dir + "/jet_members.csv")
+  m_m_edges_data = pd.read_csv(csv_dir + "/muon_muon_interactions.csv")
   if generate_jets:
-    j_m_edges_data = pd.read_csv(directory + "/jet_muon_interactions.csv")
-    m_j_edges_data = pd.read_csv(directory + "/muon_jet_interactions.csv")
-    j_j_edges_data = pd.read_csv(directory + "/jet_jet_interactions.csv")
+    j_m_edges_data = pd.read_csv(csv_dir + "/jet_muon_interactions.csv")
+    m_j_edges_data = pd.read_csv(csv_dir + "/muon_jet_interactions.csv")
+    j_j_edges_data = pd.read_csv(csv_dir + "/jet_jet_interactions.csv")
 
 
   valid_dtypes = ['float64', 'bool', 'int64']
   m_properties = [s for s in m_nodes_data.keys() if s not in ["Id", "SigBg"]]
   m_properties = [p for p in m_properties if m_nodes_data[p].dtype in valid_dtypes]
 
+  for k in muons_keys:
+    if not k in m_properties:
+      print(f"Warning: Requested muon property {k} not avaliable in CSV data! If you're certain it exists, try re-generating the CSV")
+
+  m_properties = [m for m in m_properties if m in muons_keys]
+  print(f"Muons using: {m_properties}")
+
   if generate_jets:
     j_properties = [s for s in j_nodes_data.keys() if s not in ["Id", "SigBg"]]
     j_properties = [p for p in j_properties if j_nodes_data[p].dtype in valid_dtypes]
+
+    for k in jets_keys:
+      if not k in j_properties:
+        print(f"Warning: Requested jet property {k} not avaliable in CSV data! If you're certain it exists, try re-generating the CSV")
+
+    j_properties = [j for j in j_properties if j in jets_keys]
+    print(f"Jets using: {j_properties}")
 
   with tqdm(total=7 + (12 if generate_jets else 0)) as pbar:
     m_node_features = torch.from_numpy(m_nodes_data[m_properties].to_numpy()).double()

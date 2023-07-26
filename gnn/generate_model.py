@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.insert(1, "lib")
 import numpy as np
 import torch
 from torch_geometric.data import InMemoryDataset, Data
@@ -112,19 +114,54 @@ def plot_graph(g, y, fname, node_size=30, pos=None):
 
 
 if __name__ == "__main__":
-  #matplotlib.use('GTK')
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+    prog="CMS GNN Runner",
+    description="Given a dataset, generates a GNN model to analyze it",
+    epilog="Written by Lincoln Doney, 2023"
+  )
 
-  parser.add_argument("modeldir", nargs='?', default=None)
-  parser.add_argument("-s", "--size", type=int, nargs=1, default=1000, required=False)
-  parser.add_argument("-n", "--name", type=str, nargs=1, default=None, required=False)
-  parser.add_argument('--plot-roc', action=argparse.BooleanOptionalAction, dest="plot_roc", default=True)
-  parser.add_argument('--generate-csvs', action=argparse.BooleanOptionalAction, dest="generate_csvs", default=True)
-  parser.add_argument('--normalize', action=argparse.BooleanOptionalAction, dest="normalize", default=True)
-  parser.add_argument('--jets', action=argparse.BooleanOptionalAction, dest="generate_jets", default=True)
+  parser.add_argument("modeldir", nargs='?', default=None, help="Directory to store output")
+  parser.add_argument("-s", "--size", type=int, nargs='?', default=None, required=False, help="Amount of events to take from dataset. If generate-csvs is set to false, this cannot be set")
+  parser.add_argument("-n", "--name", type=str, nargs='?', default=None, required=False, help="Name of this particular run, for access later")
+  parser.add_argument("-t", "--test", type=float, nargs='?', default=0.8, required=False, help="Percent of events to use for test")
+  parser.add_argument("-v", "--validation", type=float, nargs='?', default=0.05, required=False, help="Percent of events to use for validation")
+  parser.add_argument('--csv-dir', type=str, nargs='?', default=None, required=False, dest="csv_dir", help="If generate csvs is set to false, where to get csv files from")
+  parser.add_argument("--muons-keys", type=str, nargs='*', default=None, required=False, dest="muons_keys", help="Keys in ROOT tree to use for muons. Should be formatted as 'muons.KEY' or 'muPairs.KEY', so mass is 'muPairs.mass'")
+  parser.add_argument("--jets-keys", type=str, nargs='*', default=None, required=False, dest="jets_keys", help="Keys in ROOT tree to use for jets. Should be formatted as 'jets.KEY' or 'jetPairs.KEY', so mass is 'jetPairs.mass'")
+
+  parser.add_argument('--plot-roc', action=argparse.BooleanOptionalAction, dest="plot_roc", default=True, help="Whether or not to plot ROC curve when complete")
+  parser.add_argument('--generate-csvs', action=argparse.BooleanOptionalAction, dest="generate_csvs", default=True, help="Generate CSV files. If set to false, existing csv directory is required through --csv_dir")
+  parser.add_argument('--normalize', action=argparse.BooleanOptionalAction, dest="normalize", default=True, help="Whether to normalize data or not")
+  parser.add_argument('--jets', action=argparse.BooleanOptionalAction, dest="generate_jets", default=True, help="Whether to include jets or not")
   #parser.add_argument("-v", "--verbose", action='store_const', const=True)
-  parser.add_argument("-V", "--visualize", action='store_const', const=True, default=False, required=False)
+  parser.add_argument("-V", "--visualize", action='store_const', const=True, default=False, required=False, help="Whether to visualize graphs or not")
   args = parser.parse_args()
+  assert(not (args.generate_csvs == False and args.csv_dir == None))
+  assert(not (args.generate_csvs == False and args.size != None))
+  assert(not (args.generate_csvs == True and args.csv_dir != None))
+  assert(not (args.generate_jets == False and args.jets_keys != None))
+  assert(args.test + args.validation < 1)
+
+  if args.muons_keys == None:
+    args.muons_keys = ["muons.pt", "muons.charge", "muons.eta", "muons.phi", "muPairs.mass", "muPairs.pt", "muPairs.eta"]
+  if args.jets_keys == None:
+    args.jets_keys = ["jets.pt", "jets.mass", "jets.charge", "jets.eta", "jets.phi"]
+
+  if not args.generate_csvs:
+    csv_dir = args.csv_dir
+    print(csv_dir)
+    assert(os.path.exists(csv_dir))
+    if csv_dir[-1] == "/":
+      csv_dir = csv_dir[0:len(csv_dir) - 1]
+    if os.path.exists(csv_dir + "/jet_members.csv"):
+      args.jets = True
+    args.jets = False
+
+    args.csv_dir = csv_dir
+
+
+  if args.size == None:
+    args.size = 1000
 
   if args.modeldir == None:
     if args.name == None:
@@ -151,12 +188,12 @@ if __name__ == "__main__":
 
   if args.generate_csvs:
     print("Generating input data...")
-    generate_csv_data(output_dir = OUTPUT_DIR, takeonly = args.size[0], normalize = args.normalize, generate_jets=args.generate_jets)
+    generate_csv_data(output_dir = OUTPUT_DIR, takeonly = args.size, normalize = args.normalize, generate_jets=args.generate_jets, jets_keys = args.jets_keys, muons_keys = args.muons_keys)
 
-  data = create_graph(directory = OUTPUT_DIR, generate_jets=args.generate_jets)
+  data = create_graph(directory = OUTPUT_DIR, generate_jets=args.generate_jets, csv_dir=OUTPUT_DIR if args.csv_dir == None else args.csv_dir, jets_keys = args.jets_keys, muons_keys = args.muons_keys)
 
   # Generate test/validate/train masks
-  split = T.RandomNodeSplit(num_val=0.05, num_test=0.8, key="x")
+  split = T.RandomNodeSplit(num_val=args.validation, num_test=args.test, key="x")
   data = split(data)
 
   if args.visualize:
