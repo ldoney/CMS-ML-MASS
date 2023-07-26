@@ -61,7 +61,7 @@ std::pair<vec_s, vec_i> pickBasedOnIndex(vecvec_s options_s, vecvec_i options_i,
   return std::make_pair(res_s, res_i);
 }
 
-void run_mass_no_precut() {
+void run_bulk() {
    ROOT::EnableImplicitMT();
    TTimeStamp timestamp;
 
@@ -331,7 +331,7 @@ void run_mass_no_precut() {
 
 int main(int argc, char ** argv) {
     TApplication app("MyApp", &argc, argv);
-    run_mass_no_precut();
+    run_bulk();
     return 0;
 }
 #endif

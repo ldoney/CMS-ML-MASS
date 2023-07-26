@@ -12,9 +12,6 @@ def combine(d, generate_jets=True):
 if __name__ == "__main__":
   RUNS_DIR = "gnn/gnn_outs/model_output_dir"
   runs = ["just_gat", "just_gcn", "mixed_mu_gat", "mixed_mu_gcn"]
-  #for n in [100, 1000, 10000, 100000, 1000000]:
-  #  runs.append(str(n) + "_normalize")
-  #  runs.append(str(n) + "_no_normalize")
 
   generate_jets = True
   best_gnn = None
@@ -66,50 +63,50 @@ if __name__ == "__main__":
   best_dnn_line = None
 
 #  # Root DNN/BDTG
-#  ROOT_DIR = "bdtg_dnn/mass_output_dir"
-#  # What I did before is do a bunch of runs... for this I'm just gonna take the first
-#  runs_to_process = ["187-7-18-MASS-DNN/Run-0", "187-9-18-MASS-DNN/Run-0"]
-#  runs_to_process = [ROOT_DIR + "/" + r for r in runs_to_process]
-#
-#  for run in runs_to_process:
-#    if "Run-" in run:
-#      name = run.split("/")[-2][0:-9] + "-" + run.split("/")[-1][-1]
-#    else:
-#      name = run.split("/")[-1][0:-9]
-#    with uproot.open(run + "/TMVA.root") as file:
-#      try:
-#        bdt_dir = file["dataset"]["Method_BDT"]["BDTG"]
-#        bdt_roc = bdt_dir["MVA_BDTG_rejBvsS"]
-#        x, y = bdt_roc.to_numpy()
-#        auroc = np.trapz(x,y[1:])
-#        print(f"{name} BDTG has auroc {auroc}")
-#        # This is probably bad, for some reason y has 1 more value than x... so I just chop off the first, but that's probably unsafe
-#        line, = plt.plot(x, y[1:], label=f"BDTG {name}")
-#        if best_bdtg == None:
-#          best_bdtg = (run, auroc)
-#          best_bdtg_line = line
-#        else:
-#          best_bdtg_line = line    if auroc > best_bdtg[1] else best_bdtg_line
-#          best_bdtg = (run, auroc) if auroc > best_bdtg[1] else best_bdtg
-#      except Exception as exc:
-#        #print(exc)
-#        print(f"No DNN found for run {name}!")
-#      try:
-#        dnn_dir = file["dataset"]["Method_DL"]["TMVA_DNN_GPU"]
-#        dnn_roc = dnn_dir["MVA_TMVA_DNN_GPU_rejBvsS"]
-#        x, y = dnn_roc.to_numpy()
-#        auroc = np.trapz(x,y[1:])
-#        print(f"{name} DNN has auroc {auroc}")
-#        line, = plt.plot(x, y[1:], label=f"DNN {name}")
-#        if best_dnn == None:
-#          best_dnn = (run, auroc)
-#          best_dnn_line = line
-#        else:
-#          best_dnn_line = line    if auroc > best_dnn[1] else best_dnn_line
-#          best_dnn = (run, auroc) if auroc > best_dnn[1] else best_dnn
-#      except Exception as exc:
-#        #print(exc)
-#        print(f"No DNN found for run {name}!")
+  ROOT_DIR = "bdtg_dnn/mass_output_dir"
+  # What I did before is do a bunch of runs... for this I'm just gonna take the first
+  runs_to_process = ["187-7-18-MASS-DNN/Run-0", "187-9-18-MASS-DNN/Run-0"]
+  runs_to_process = [ROOT_DIR + "/" + r for r in runs_to_process]
+
+  for run in runs_to_process:
+    if "Run-" in run:
+      name = run.split("/")[-2][0:-9] + "-" + run.split("/")[-1][-1]
+    else:
+      name = run.split("/")[-1][0:-9]
+    with uproot.open(run + "/TMVA.root") as file:
+      try:
+        bdt_dir = file["dataset"]["Method_BDT"]["BDTG"]
+        bdt_roc = bdt_dir["MVA_BDTG_rejBvsS"]
+        x, y = bdt_roc.to_numpy()
+        auroc = np.trapz(x,y[1:])
+        print(f"{name} BDTG has auroc {auroc}")
+        # This is probably bad, for some reason y has 1 more value than x... so I just chop off the first, but that's probably unsafe
+        line, = plt.plot(x, y[1:], label=f"BDTG {name}")
+        if best_bdtg == None:
+          best_bdtg = (run, auroc)
+          best_bdtg_line = line
+        else:
+          best_bdtg_line = line    if auroc > best_bdtg[1] else best_bdtg_line
+          best_bdtg = (run, auroc) if auroc > best_bdtg[1] else best_bdtg
+      except Exception as exc:
+        #print(exc)
+        print(f"No DNN found for run {name}!")
+      try:
+        dnn_dir = file["dataset"]["Method_DL"]["TMVA_DNN_GPU"]
+        dnn_roc = dnn_dir["MVA_TMVA_DNN_GPU_rejBvsS"]
+        x, y = dnn_roc.to_numpy()
+        auroc = np.trapz(x,y[1:])
+        print(f"{name} DNN has auroc {auroc}")
+        line, = plt.plot(x, y[1:], label=f"DNN {name}")
+        if best_dnn == None:
+          best_dnn = (run, auroc)
+          best_dnn_line = line
+        else:
+          best_dnn_line = line    if auroc > best_dnn[1] else best_dnn_line
+          best_dnn = (run, auroc) if auroc > best_dnn[1] else best_dnn
+      except Exception as exc:
+        #print(exc)
+        print(f"No DNN found for run {name}!")
 
   if best_gnn_line != None:
     best_gnn_line.set_linewidth(4)

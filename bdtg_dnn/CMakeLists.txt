@@ -21,7 +21,13 @@ separate_arguments(ROOT_EXE_LINKER_FLAGS)
 
 SET(CMAKE_CXX_FLAGS "-lTMVA -Dcuda=ON -Dcudnn=ON -Dtmva-gpu=ON -Dall=ON ${CMAKE_CXX_FLAGS}")
 
-add_executable ( run_mass_no_precut run_mass_no_precut.cpp )
-target_link_libraries ( run_mass_no_precut PUBLIC ${ROOT_LIBRARIES}
+add_executable ( run_bulk run_bulk.cpp )
+target_link_libraries ( run_bulk PUBLIC ${ROOT_LIBRARIES}
                                                   ${ROOT_EXE_LINKER_FLAGS}
                                                   PRIVATE CUDA::cudart)
+
+add_executable ( run_single run_single.cpp )
+target_link_libraries ( run_single PUBLIC ${ROOT_LIBRARIES}
+                                                  ${ROOT_EXE_LINKER_FLAGS}
+                                                  PRIVATE CUDA::cudart)
+
