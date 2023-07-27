@@ -20,7 +20,7 @@ enum {
   MUONS, JETS, MUONPAIRS, MUONPAIRS_AND_JETS
 };
 
-void tmva() {
+void run_single() {
    ROOT::EnableImplicitMT();
    TTimeStamp timestamp;
 
@@ -152,14 +152,14 @@ void tmva() {
    outputFile->Close();
    std::cout << "==> Wrote root file: " << outputFile->GetName() << std::endl;
    std::cout << "==> TMVAClassification is done!" << std::endl;
-   if (!gROOT->IsBatch()) TMVA::TMVAGui( *outfileName );
+   //if (!gROOT->IsBatch()) TMVA::TMVAGui( *outfileName );
    delete factory;
    delete dataloader;
 }
 
 int main(int argc, char ** argv) {
     TApplication app("MyApp", &argc, argv);
-    tmva();
+    run_single();
     app.Run();
     return 0;
 }

@@ -18,14 +18,17 @@
 
 using json = nlohmann::json;
 
+// All presets of variables for use later
 typedef enum {
   MUONS, JETS, MUONPAIRS, MUONPAIRS_AND_JETS, ALL
-} variable_set;
+} variable_preset;
 
+// Methods to use in factory, ALL_METHODS just does both
 typedef enum {
   BDTG, DNN, ALL_METHODS
-} method_for_factory;
+} ml_method;
 
+// Finds an element in a list and returns pointer to it
 template<typename T, typename UnaryPredicate>
 T* find(std::vector<T> vec, UnaryPredicate pred) {
   auto it = std::find_if(vec.begin(), vec.end(), pred);
@@ -35,6 +38,7 @@ T* find(std::vector<T> vec, UnaryPredicate pred) {
   return NULL;
 }
 
+// Returns true if predicate is true for any elements in the list
 template<typename T, typename UnaryPredicate>
 bool contains_pred(std::vector<T> vec, UnaryPredicate pred) {
   auto it = std::find_if(vec.begin(), vec.end(), pred);
@@ -44,11 +48,13 @@ bool contains_pred(std::vector<T> vec, UnaryPredicate pred) {
   return false;
 }
 
+// Returns true if values is in vec
 template<typename T, typename UnaryPredicate>
 bool contains(std::vector<T> vec, T value) {
   return contains_pred(vec, [value](T compare) {return compare == value;});
 }
 
+// Returns all values who return true for predicate pred in a new vector
 template<typename T, typename UnaryPredicate>
 std::vector<T> find_all(std::vector<T> vec, UnaryPredicate pred) {
   std::vector<T> matches;
@@ -56,7 +62,8 @@ std::vector<T> find_all(std::vector<T> vec, UnaryPredicate pred) {
   return matches;
 }
 
-std::string method_to_string(method_for_factory m) {
+// Converts elements of the ml_method enum to a string for use in JSON
+std::string method_to_string(ml_method m) {
   switch(m) {
     case ALL_METHODS:
       return "ALL";
@@ -69,28 +76,35 @@ std::string method_to_string(method_for_factory m) {
   }
 }
 
-typedef std::tuple<std::string, std::string, std::string, char> variable_tuple;
-
-method_for_factory get_method_from_string(std::string str) {
+// Turns a string from JSON to elements of ml_method (inverse of above function)
+ml_method get_method_from_string(std::string str) {
    if(str == "BDTG") return BDTG;
    if(str == "DNN") return DNN;
    if(str == "ALL_METHODS") return ALL_METHODS;
    return BDTG;
 }
 
+// This is effectively the definition of a variable for use in TMVA
+typedef std::tuple<std::string, std::string, std::string, char> variable_tuple;
+
+// Turns string into a variable_tuple, this is just to force it in
 variable_tuple get_tuple_from_string(std::string str) {
    return {str, str, "units", 'F'};
 }
 
+// Turns a string from JSON into its boolean value (T/F)
 bool stob(std::string str) {
   return str == "true";
 }
 
+// Turns a boolean into its string for use in JSON
 std::string btos(bool b) {
   return b ? "true" : "false";
 }
 
-std::vector<variable_tuple> variable_set_to_tuples(variable_set set) {
+// Turns variable_preset elements into a vector of variables for use in TMVA. This just expands out the 
+// presets into their parts.
+std::vector<variable_tuple> variable_preset_to_tuples(variable_preset set) {
   std::vector<variable_tuple> toReturn;
   std::vector<std::string> collection;
   switch (set) {
@@ -128,10 +142,13 @@ std::vector<variable_tuple> variable_set_to_tuples(variable_set set) {
   return toReturn;
 }
 
-class RunningProperties : public TObject {
+class RunProperties : public TObject {
   public:
+    // In the future, it's probably a good idea to make multiple children class which contain
+    // these variables, one for each type of ML method. Right now, we're sort of shoving everything
+    // together, which is fine but sort of confusing.
     std::vector<variable_tuple> variables;
-    std::vector<method_for_factory> methods;
+    std::vector<ml_method> methods;
     Int_t numSignalTrain;
     Int_t numBackgroundTrain;
     Int_t numSignalTest;
@@ -145,6 +162,7 @@ class RunningProperties : public TObject {
     TString cut;
     Bool_t isSuccess;
 
+    // Turns the properties stored in this object into a string for use in TMVA
     TString produceDNNString() {
       TString layoutString("Layout=");
       for(int i = 0; i < this->numLayers; i++) {
@@ -173,12 +191,15 @@ class RunningProperties : public TObject {
        
       return dnnOptions;
     }
-    bool containsMethod(method_for_factory m) {
+
+    // Convenience function to see if this RunProperties is supposed to run a given method
+    bool containsMethod(ml_method m) {
       return (std::find(this->methods.begin(), this->methods.end(), ALL_METHODS) != this->methods.end()) 
           || (std::find(this->methods.begin(), this->methods.end(), m) != this->methods.end());
     }
 
-    RunningProperties(std::vector<variable_tuple> variables, int numSignalTrain, int numBackgroundTrain, TString cut, std::vector<method_for_factory> methods = {BDTG, DNN, ALL_METHODS}) {
+    // Base constructor for RunProperties object
+    RunProperties(std::vector<variable_tuple> variables, int numSignalTrain, int numBackgroundTrain, TString cut, std::vector<ml_method> methods = {BDTG, DNN, ALL_METHODS}) {
      this->numBackgroundTrain = numBackgroundTrain;
      this->numSignalTrain = numSignalTrain;
      this->methods = methods;
@@ -187,22 +208,15 @@ class RunningProperties : public TObject {
      this->isSuccess = false;
     }
     
-    RunningProperties(variable_set set, int numSignalTrain, int numBackgroundTrain, TString cut, std::vector<method_for_factory> methods = {BDTG, DNN, ALL_METHODS}) : RunningProperties(variable_set_to_tuples(set), numSignalTrain, numBackgroundTrain, cut, methods) {}
+    // Constructor for RunProperties using a variable preset
+    RunProperties(variable_preset set, int numSignalTrain, int numBackgroundTrain, TString cut, std::vector<ml_method> methods = {BDTG, DNN, ALL_METHODS}) : RunProperties(variable_preset_to_tuples(set), numSignalTrain, numBackgroundTrain, cut, methods) {}
 
-    RunningProperties clone() {
-      RunningProperties rp(this->variables, this->numSignalTrain, this->numBackgroundTrain, this->cut.Data(), this->methods);
-      rp.numTrees = this->numTrees;
-      rp.numTrees = this->maxDepth;
-      rp.numSignalTest = this->numSignalTest;
-      rp.numBackgroundTest = this->numBackgroundTest;
-      return rp;
-    }
-
-    RunningProperties(std::map<std::string, std::string> data) {
+    // Map constructor for RunProperties
+    RunProperties(std::map<std::string, std::string> data) {
       std::string methodsTString = data["methods"];
       json jsonData = json::parse(methodsTString);
       std::vector<std::string> methods_as_strs = jsonData.get<std::vector<std::string>>();
-      std::vector<method_for_factory> methods = {};
+      std::vector<ml_method> methods = {};
       std::transform(methods_as_strs.begin(), methods_as_strs.end(), back_inserter(methods), get_method_from_string);
       this->methods = methods;
 
@@ -236,31 +250,29 @@ class RunningProperties : public TObject {
       std::transform(variables_as_strs.begin(), variables_as_strs.end(), back_inserter(variables), get_tuple_from_string);
       this->variables = variables;
     }
- 
-   void exclude_via_binary(int n) {
-     bool enabled[this->variables.size()];
-     for(int i = 0; i < this->variables.size(); i++) {
-       enabled[i] = (n >> i) & 1;
-     }
-     for(int i = 0; i < this->variables.size(); i++) {
-       if (enabled[i]) {
-         this->exclude_variable(std::get<0>(this->variables[i]));
-       }
-     }
-   }
-    
+
+    // Clone a RunProperties
+    RunProperties clone() {
+      RunProperties rp(this->variables, this->numSignalTrain, this->numBackgroundTrain, this->cut.Data(), this->methods);
+      rp.numTrees = this->numTrees;
+      rp.numTrees = this->maxDepth;
+      rp.numSignalTest = this->numSignalTest;
+      rp.numBackgroundTest = this->numBackgroundTest;
+      return rp;
+    }
+  
+    // Include a particular variable in the set of variables here
     void include_variable(variable_tuple tup) {
       this->variables.insert(this->variables.begin(), tup);
     }
-
     void include_variable(std::string variable, std::string name, std::string unit, char type) {
       include_variable(make_tuple(variable, name, unit, type));
     }
-    
     void include_variable(std::string variable, std::string name) {
       include_variable(variable, name, "units", 'F');
     }
 
+    // Exclude a variable by name. This just removes it from the variables field in the class
     void exclude_variable(std::string to_exclude) {
       auto pred = [to_exclude](variable_tuple tup) {return std::get<0>(tup) == to_exclude;};
       auto all_matches = find_all(variables, pred);
@@ -273,6 +285,23 @@ class RunningProperties : public TObject {
       }
     }
 
+    // Excludes variables form the set in such a way that
+    // its on/off based on an integer. This is for use in the 
+    // run_bulk splitting stuff
+    void exclude_via_binary(int n) {
+      bool enabled[this->variables.size()];
+      for(int i = 0; i < this->variables.size(); i++) {
+        enabled[i] = (n >> i) & 1;
+      }
+      for(int i = 0; i < this->variables.size(); i++) {
+        if (enabled[i]) {
+          this->exclude_variable(std::get<0>(this->variables[i]));
+        }
+      }
+    }
+     
+    // Creates a Dataloader object and fills it with the contents of this
+    // RunProperties object
     TMVA::DataLoader *generateDataLoader(std::string path) {
       TMVA::DataLoader *dataloader = new TMVA::DataLoader(path);
       for (auto it = this->variables.begin(); it != this->variables.end(); ++it) {
@@ -281,6 +310,8 @@ class RunningProperties : public TObject {
       return dataloader;
     }
 
+    // Fills a given factory and dataloader with the methods necessary. Effectively, it tells
+    // TMVA to actually use these methods
     void fillFactory(TMVA::Factory *factory, TMVA::DataLoader *dataloader) {
       if (this->containsMethod(BDTG)) {
         factory->BookMethod( dataloader, TMVA::Types::kBDT, "BDTG", "!H:!V:NTrees=" + std::to_string(this->numTrees) + ":MinNodeSize=2.5%:BoostType=Grad:Shrinkage=0.10:UseBaggedBoost:BaggedSampleFraction=0.5:nCuts=20:MaxDepth="  + std::to_string(this->maxDepth));
@@ -290,6 +321,7 @@ class RunningProperties : public TObject {
      }
    }
 
+   // Fills Dataloader with relevant counts for each particular type of event
    void fillDataLoaderForTree(TMVA::DataLoader *dataloader) {
      TCut baseCondition = "";
      for(int i = 0; i < this->variables.size(); i++) {
@@ -302,6 +334,8 @@ class RunningProperties : public TObject {
       "nTrain_Signal=" + std::to_string(this->numSignalTrain) + ":nTrain_Background=" + std::to_string(this->numBackgroundTrain) + ":nTest_Signal=" + std::to_string(this->numSignalTest) + ":nTest_Background=" + std::to_string(this->numBackgroundTest) + ":SplitMode=Random:NormMode=NumEvents:!V" );
    }
 
+   // Turns this RunProperties to a map for use in JSON to be able to save it
+   // and read it again later
    std::map<std::string, std::string> to_map() {
      std::vector<std::string> listOfMethods;
      std::transform(this->methods.begin(), this->methods.end(), back_inserter(listOfMethods), method_to_string);
@@ -341,9 +375,10 @@ class RunningProperties : public TObject {
      return data;
    }
 
+   // Print the RunProperties object to standard out
    void Print() {
-     std::cout << "RunningProperties:\n  - methods: [";
-     for (std::vector<method_for_factory>::iterator it = this->methods.begin(); it != this->methods.end(); ++it) {
+     std::cout << "RunProperties:\n  - methods: [";
+     for (std::vector<ml_method>::iterator it = this->methods.begin(); it != this->methods.end(); ++it) {
        if (it != this->methods.begin()) {
             std::cout << ", ";
        }
@@ -381,9 +416,9 @@ class RunningResults {
     Double_t rocIntegral;
     Double_t kolS;
     Double_t kolB;
-    RunningProperties *associatedProperties;
+    RunProperties *associatedProperties;
     Bool_t failed;
-    RunningResults(Double_t rocIntegral, Double_t kolS, Double_t kolB, RunningProperties *associatedProperties) {
+    RunningResults(Double_t rocIntegral, Double_t kolS, Double_t kolB, RunProperties *associatedProperties) {
       this->rocIntegral = rocIntegral;
       this->kolS = kolS;
       this->kolB = kolB;
